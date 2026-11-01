@@ -36,11 +36,11 @@ TEMPLATE = r'''<!DOCTYPE html>
 <title>⚽ Tournoi Vétérans UST</title>
 <style>
 *{box-sizing:border-box}
-body{margin:0;min-height:100vh;display:none;align-items:center;justify-content:center;padding:24px;font-family:'Segoe UI',system-ui,sans-serif;color:#fff;background:radial-gradient(ellipse at top,#145[...]
+body{margin:0;min-height:100vh;display:none;align-items:center;justify-content:center;padding:24px;font-family:'Segoe UI',system-ui,sans-serif;color:#fff;background:radial-gradient(ellipse at top,#145a28 0%,#0a2e15 60%,#04140a 100%)}
 .box{width:100%;max-width:460px;text-align:center}
 h1{font-size:26px;margin:0 0 6px}
 p{margin:0 0 26px;color:#b9d8c1;font-size:14px}
-a.card{display:flex;align-items:center;gap:16px;margin:12px 0;padding:18px 20px;border-radius:16px;text-decoration:none;color:#fff;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1[...]
+a.card{display:flex;align-items:center;gap:16px;margin:12px 0;padding:18px 20px;border-radius:16px;text-decoration:none;color:#fff;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);transition:.15s}
 a.card:hover,a.card:active{background:rgba(255,255,255,.16);transform:translateY(-1px)}
 a.card.last{border-color:#6ee790;box-shadow:0 0 0 2px rgba(110,231,144,.25)}
 .num{font-size:34px;font-weight:800;min-width:56px;color:#6ee790}
@@ -59,7 +59,7 @@ a.card.last{border-color:#6ee790;box-shadow:0 0 0 2px rgba(110,231,144,.25)}
 (function(){
   var f = new URLSearchParams(location.search).get('f');
   var el = f && document.getElementById('app'+f);
-  function unesc(s){ return s.replace(/<\\/script/g,'</script').replace(/<\\script/g,'<script').replace(/<\\!--/g,'<!--'); }
+  function unesc(s){ return s.replace(/<\\\/script/g,'</script').replace(/<\\script/g,'<script').replace(/<\\!--/g,'<!--'); }
   function start(){
     if(!el){
       try{ var last=localStorage.getItem('footFormat'); var c=document.querySelector('a.card[data-f="'+last+'"]'); if(c) c.classList.add('last'); }catch(e){}
@@ -69,7 +69,7 @@ a.card.last{border-color:#6ee790;box-shadow:0 0 0 2px rgba(110,231,144,.25)}
     }
     var html = unesc(el.textContent);
     // petit bouton « changer de format » (retour au menu), injecté avant la dernière balise </body>
-    var btn = '<a href="'+location.pathname+'" title="Changer de format (12 / 16 / 20 / 24 équipes)" style="position:fixed;left:8px;bottom:8px;z-index:150;width:30px;height:30px;border-radius:50%;bac[...]
+    var btn = '<a href="'+location.pathname+'" title="Changer de format (12 / 16 / 20 / 24 équipes)" style="position:fixed;left:8px;bottom:8px;z-index:150;width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;font:16px/30px sans-serif;text-align:center;text-decoration:none;opacity:.5">⚽</a>';
     var i = html.lastIndexOf('</body>');
     if(i>-1) html = html.slice(0,i)+btn+html.slice(i);
     document.open(); document.write(html); document.close();
@@ -82,5 +82,10 @@ a.card.last{border-color:#6ee790;box-shadow:0 0 0 2px rgba(110,231,144,.25)}
 </body>
 </html>
 '''
-open(os.path.join(BASE,OUT),'w',encoding='utf-8',newline='\n').write(TEMPLATE.replace('@@BLOCKS@@','\n'.join(blocks)).replace('@@CARDS@@','\n'.join('  <a class="card" data-f="%d" href="?f=%d"><span cl[...]
-print('OK ->',OUT, round(os.path.getsize(os.path.join(BASE,OUT))/1024),'Ko')
+cards = ''
+for n in SRC:
+    cards += '  <a class="card" data-f="' + str(n) + '" href="?f=' + str(n) + '"><span class="num">' + str(n) + '</span><span class="lbl">' + str(n) + ' équipes</span></a>' + chr(10)
+html = TEMPLATE.replace('@@BLOCKS@@', chr(10).join(blocks)).replace('@@CARDS@@', cards)
+with open(os.path.join(BASE, OUT), 'w', encoding='utf-8', newline=chr(10)) as fh:
+    fh.write(html)
+print('OK ->', OUT, round(os.path.getsize(os.path.join(BASE, OUT)) / 1024), 'Ko')
