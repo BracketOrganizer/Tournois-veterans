@@ -1,0 +1,44 @@
+name: Générer index.html
+
+on:
+  push:
+    paths:
+      - 'Sources/**'
+      - 'sources/**'
+      - 'build_veterans.py'
+  workflow_dispatch:   # bouton « Run workflow » dans l'onglet Actions
+
+permissions:
+  contents: write
+  pages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Générer index.html
+        run: python3 build_veterans.py
+
+      - name: Enregistrer index.html s'il a changé
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          if git diff --cached --quiet; then
+            echo "index.html inchangé"
+          else
+            git commit -m "Régénération automatique de index.html"
+            git push
+          fi
+
+      - name: Relancer la publication GitHub Pages
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh api -X POST repos/${{ github.repository }}/pages/builds
