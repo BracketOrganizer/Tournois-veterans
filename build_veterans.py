@@ -82,9 +82,15 @@ a.card.last{border-color:#6ee790;box-shadow:0 0 0 2px rgba(110,231,144,.25)}
 </body>
 </html>
 '''
+INFO = {
+    12: '3 formules · 4 à 6 matchs par équipe',
+    16: '4 poules de 4 · 6 matchs par équipe',
+    20: '4 poules de 5 · 6 matchs par équipe',
+    24: '4 poules de 6 · 8 matchs par équipe',
+}
 cards = ''
 for n in SRC:
-    cards += '  <a class="card" data-f="' + str(n) + '" href="?f=' + str(n) + '"><span class="num">' + str(n) + '</span><span class="lbl">' + str(n) + ' équipes</span></a>' + chr(10)
+    cards += '  <a class="card" data-f="' + str(n) + '" href="?f=' + str(n) + '"><span class="num">' + str(n) + '</span><span class="lbl">' + str(n) + ' équipes<small>' + INFO.get(n, '') + '</small></span></a>' + chr(10)
 html = TEMPLATE.replace('@@BLOCKS@@', chr(10).join(blocks)).replace('@@CARDS@@', cards)
 with open(os.path.join(BASE, OUT), 'w', encoding='utf-8', newline=chr(10)) as fh:
     fh.write(html)
