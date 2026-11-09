@@ -1680,7 +1680,7 @@ function renderRulesProgram(){
     <p>Durée des matchs : 1 période unique de ${dur} minutes.</p>
     <p>En cas d'égalité de points à l'issue des matchs de la Phase 1, les critères suivants seront appliqués, dans l'ordre indiqué, pour établir le classement définitif :</p>
     <ul>
-      <li>Goal-average particulier (résultat lors de la rencontre directe entre les deux équipes).</li>
+      <li>Goal-average particulier (résultat lors de la rencontre directe entre les deux équipes ; ce critère ne s'applique que lorsque deux équipes seulement sont à égalité de points, il n'est pas appliqué à trois équipes ou plus).</li>
       <li>Goal-average général (différence entre buts marqués et buts encaissés).</li>
       <li>Meilleure attaque (plus grand nombre de buts marqués).</li>
       <li>Tirs au but, selon la procédure de l'Article 8.</li>
@@ -3555,6 +3555,7 @@ function updateRulesDyn(){
       if(m){ d.textContent='Date du tournoi : '+new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'}); d.style.display=''; }
       else d.style.display='none';
     }
+    const rt=document.getElementById('rulesRefTeam'); if(rt) rt.style.display = c.teamRefereeingEnabled ? '' : 'none';
     const a=+c.matchDur||13, b=false ? (+c.matchDurBracket||a) : a;
     document.querySelectorAll('.rDurP').forEach(e=>{ e.textContent=a+' minutes'; });
     document.querySelectorAll('.rDurF').forEach(e=>{ e.textContent=b+' minutes'; });
@@ -6471,7 +6472,7 @@ input[type=date]{ width:100%;padding:9px 12px;background:var(--s2);border:1.5px 
       <li id="rulesA3a"></li>
       <li id="rulesA3b"></li>
     </ul>
-    <p>La ponctualité est impérative. Les équipes doivent se présenter au terrain désigné 4 minutes avant le début de leur match. En cas d'absence, sauf force majeure dûment constatée par l'organisation, l'équipe est déclarée forfait. Le match est alors considéré comme perdu (voir Article 5 pour l'attribution des points).</p>
+    <p>La ponctualité est impérative. Les équipes doivent se présenter au terrain désigné 4 minutes avant le début de leur match. En cas d'absence à l'heure prévue du coup d'envoi, sauf force majeure dûment constatée par l'organisation, l'équipe est déclarée forfait : le match est perdu sur le score de 3-0 (voir Article 5 pour l'attribution des points).</p>
     <p>La durée des matchs est gérée par la table de marque. L'arbitre central est seul juge du temps additionnel à accorder.</p>
   </div>
 
@@ -6487,6 +6488,8 @@ input[type=date]{ width:100%;padding:9px 12px;background:var(--s2);border:1.5px 
       <li>Engagement : les joueurs adverses doivent se tenir à 6 mètres du ballon.</li>
       <li>Fautes dans la surface de réparation : coup de pied de réparation (penalty) à 9 mètres.</li>
       <li>Fautes en dehors de la surface : coup franc direct, avec un mur à 6 mètres.</li>
+      <li>Tenue : en cas de similitude des maillots avec l'équipe adverse, l'équipe désignée comme extérieure porte les chasubles fournies par l'organisation.</li>
+      <li>Remplacements : illimités, effectués sur jeu arrêté, à la ligne médiane, avec l'accord de l'arbitre. Un joueur remplacé peut revenir en jeu. Le gardien peut être remplacé par un joueur de champ, sous réserve que celui-ci porte un maillot ou une chasuble distincte.</li>
     </ul>
   </div>
 
@@ -6497,7 +6500,7 @@ input[type=date]{ width:100%;padding:9px 12px;background:var(--s2);border:1.5px 
       <li>Match gagné : 3 points</li>
       <li>Match nul : 1 point</li>
       <li>Match perdu : 0 point</li>
-      <li>Match perdu pour forfait : 0 point</li>
+      <li>Match perdu pour forfait : 0 point (score de 3-0 en faveur de l'adversaire)</li>
     </ul>
   </div>
 
@@ -6505,12 +6508,27 @@ input[type=date]{ width:100%;padding:9px 12px;background:var(--s2);border:1.5px 
 
   <div class="rules-section">
     <h4>Article 8 : Déroulement des Tirs au but</h4>
-    <p>Procédure des tirs au but : tous les joueurs présents et inscrits sur la feuille de match peuvent tirer un penalty. Chaque équipe exécute alternativement un tir au but jusqu'à ce qu'une équipe marque un but de plus que l'autre équipe, à égalité de tirs.</p>
+    <p>Procédure des tirs au but : tous les joueurs présents et inscrits sur la feuille de match peuvent tirer un penalty. Chaque équipe exécute alternativement un tir au but ; un joueur ne peut tirer une seconde fois que lorsque tous les joueurs inscrits de son équipe ont tiré. La séance prend fin dès qu'une équipe a marqué un but de plus que l'autre équipe, à égalité de tirs.</p>
   </div>
 
   <div class="rules-section">
     <h4>Article 9 : Litiges et Arbitrage</h4>
+    <p>L'arbitre central est désigné par l'organisation, selon le planning publié. Il est seul juge des faits de jeu : ses décisions sont sans appel.</p>
+    <p id="rulesRefTeam" style="display:none">Arbitrage par les équipes : chaque match est arbitré par une équipe qui ne joue pas à cet horaire (en phase de poules, une équipe d'une autre poule ; en phase finale, une équipe libre à cet horaire), désignée par l'organisation dans le planning publié. Une équipe n'arbitre jamais son propre match. L'équipe désignée fournit l'arbitre central de la rencontre.</p>
     <p>Le Comité d'Organisation du tournoi est seul habilité à régler tout litige. Aucune réclamation ne sera acceptée après la fin du tournoi.</p>
+  </div>
+  <div class="rules-section">
+    <h4>Article 10 : Discipline</h4>
+    <ul>
+      <li><b>Carton jaune</b> : exclusion temporaire de 2 minutes, sans remplacement du joueur exclu : l'équipe joue à un joueur de moins pendant ces 2 minutes. Le joueur peut ensuite revenir en jeu. Un second avertissement pour le même joueur dans un match entraîne son exclusion définitive (voir ci-dessous).</li>
+      <li><b>Carton rouge</b> (ou second avertissement) : exclusion définitive du joueur pour le reste du match, sans remplacement. Son équipe termine le match en infériorité numérique. Le joueur exclu peut participer au match suivant, sauf décision contraire du Comité d'Organisation en cas de faute grave.</li>
+      <li>Si le joueur exclu est le gardien, il est remplacé dans les buts par un joueur de champ, conformément à l'article 4.</li>
+    </ul>
+  </div>
+
+  <div class="rules-section">
+    <h4>Article 11 : Responsabilité</h4>
+    <p>L'organisation ne peut être tenue responsable des objets personnels perdus, volés ou détériorés dans l'enceinte du tournoi.</p>
   </div>
 </div>
 </div>
