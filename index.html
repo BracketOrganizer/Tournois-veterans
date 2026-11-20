@@ -13345,7 +13345,6 @@ input[type=date]{ width:100%;padding:9px 12px;background:var(--s2);border:1.5px 
 
 </div><\!-- /appScreen -->
 </body></html>
-
 </script>
 <script type="text/plain" id="app20">
 <!DOCTYPE html>
@@ -26373,7 +26372,6 @@ input[type=date]{ width:100%;padding:9px 12px;background:var(--s2);border:1.5px 
 
 </div><\!-- /appScreen -->
 </body></html>
-
 </script>
 <script>
 (function(){
@@ -26393,12 +26391,14 @@ async function loadSettings(){
   catch(e){ SET=null; }
   return SET;
 }
-function overlay(html){
+function overlay(html,onClose){
   var o=document.createElement('div'); o.className='hub-ov'; o.setAttribute('role','dialog'); o.setAttribute('aria-modal','true');
   o.innerHTML='<div class="hub-card">'+html+'</div>';
-  o.addEventListener('click',function(e){ if(e.target===o) o.remove(); });
+  o._close=function(){ if(o.parentNode) o.parentNode.removeChild(o); if(onClose){ try{ onClose(); }catch(e){} } };
+  o.addEventListener('click',function(e){ if(e.target===o) o._close(); });
   document.body.appendChild(o); return o;
 }
+function closePanel(body){ var o=body&&body.closest?body.closest('.hub-ov'):null; if(o&&o._close) o._close(); else refreshMenu(); }
 function setMsg(el,t,c){ if(el){ el.textContent=t; el.className='hub-msg '+(c||''); } }
 function errText(e){
   var c=e&&e.code||'';
@@ -26432,17 +26432,23 @@ function applyMenu(s){
   [].forEach.call(document.querySelectorAll('a.card'),function(a){ a.style.display=(common&&a.getAttribute('data-f')!==fmt)?'none':''; });
   var intro=$('menuIntro');
   if(intro){
+    if(intro.getAttribute('data-orig')===null) intro.setAttribute('data-orig',intro.textContent);
     if(common&&fmt){ intro.textContent='✅ Le tournoi est ouvert : connectez-vous dans l\u2019appli ci-dessous avec l\u2019email utilisé pour l\u2019inscription.'; intro.style.display=''; }
     else if(common){ intro.style.display='none'; }
+    else { intro.textContent=intro.getAttribute('data-orig'); intro.style.display=''; }
   }
+  var slot=$('hubSlot'); if(slot && !common) slot.innerHTML='';
   if(common) renderBanner(s);
   if(box) box.classList.remove('hub-wait');
 }
+async function refreshMenu(){ var s=await loadSettings(); applyMenu(s); }
 function openReg(){
+  var LIM=(SET&&+SET.maxTeamsPerClub)||0, MAXN=LIM>0?LIM:6;
   var o=overlay('<button class="hub-x" aria-label="Fermer">×</button><h2>Inscription au tournoi</h2>'+
     '<p>Votre inscription sera examinée par l\u2019organisation. Vous pourrez ensuite vous connecter dans l\u2019appli du tournoi avec les mêmes identifiants.</p>'+
+    (LIM>0?'<p><b>Maximum '+LIM+' équipe'+(LIM>1?'s':'')+' par club / entreprise.</b></p>':'')+
     '<label for="hr_team">Nom de l\u2019équipe *</label><input id="hr_team" type="text" autocomplete="off">'+
-    '<div id="hr_extra"></div><button class="hub-btn sec" id="hr_add" type="button" style="margin-top:8px">+ Inscrire une autre équipe</button>'+
+    '<div id="hr_extra"></div><button class="hub-btn sec" id="hr_add" type="button" style="margin-top:8px'+(MAXN<=1?';display:none':'')+'">+ Inscrire une autre équipe</button>'+
     '<label for="hr_club">Club / Entreprise *</label><input id="hr_club" type="text">'+
     '<label for="hr_contact">Nom du responsable *</label><input id="hr_contact" type="text" autocomplete="name">'+
     '<label for="hr_email">Email *</label><input id="hr_email" type="email" autocomplete="email">'+
@@ -26455,9 +26461,9 @@ function openReg(){
   var add=o.querySelector('#hr_add');
   add.onclick=function(){
     var w=o.querySelector('#hr_extra'), n=w.querySelectorAll('input').length+2;
-    if(n>6) return;
+    if(n>MAXN) return;
     var i=document.createElement('input'); i.type='text'; i.className='hr_x'; i.placeholder='Nom de l\u2019équipe '+n; i.style.marginTop='8px'; w.appendChild(i);
-    if(n>=6) add.style.display='none';
+    if(n>=MAXN) add.style.display='none';
   };
   o.querySelector('#hr_go').onclick=async function(){
     var g=function(id){return (o.querySelector('#'+id).value||'').trim();}, msg=o.querySelector('#hr_msg');
@@ -26467,6 +26473,7 @@ function openReg(){
     var names=[team].concat([].slice.call(o.querySelectorAll('.hr_x')).map(function(i){return i.value.trim();})).filter(Boolean);
     var low=names.map(function(n){return n.toLowerCase();});
     if(low.filter(function(n,i){return low.indexOf(n)!==i;}).length){ setMsg(msg,'Deux équipes ont le même nom : merci de les différencier.','err'); return; }
+    if(LIM>0 && names.length>LIM){ setMsg(msg,'Maximum '+LIM+' équipe'+(LIM>1?'s':'')+' par club / entreprise.','err'); return; }
     if(pwd.length<6){ setMsg(msg,'Le mot de passe doit faire au moins 6 caractères.','err'); return; }
     if(pwd!==pwd2){ setMsg(msg,'Les deux mots de passe ne correspondent pas.','err'); return; }
     var btn=this; btn.disabled=true; setMsg(msg,'Envoi en cours…','');
@@ -26474,6 +26481,8 @@ function openReg(){
     try{
       var cur=await loadSettings();
       if(cur && cur.regOpen===false){ setMsg(msg,'Les inscriptions sont fermées.','err'); btn.disabled=false; return; }
+      var L2=(cur&&+cur.maxTeamsPerClub)||0;
+      if(L2>0 && names.length>L2){ setMsg(msg,'Maximum '+L2+' équipe'+(L2>1?'s':'')+' par club / entreprise.','err'); btn.disabled=false; return; }
       f=await fb(); cred=await f.au.createUserWithEmailAndPassword(f.auth,email,pwd);
     }catch(e){ setMsg(msg,errText(e),'err'); btn.disabled=false; return; }
     try{
@@ -26489,8 +26498,8 @@ function openReg(){
 
 /* ───────── Espace organisateur ───────── */
 function openAdmin(){
-  var o=overlay('<button class="hub-x" aria-label="Fermer">×</button><h2>⚙️ Espace organisateur</h2><div id="ha_body"></div>');
-  o.querySelector('.hub-x').onclick=function(){o.remove();};
+  var o=overlay('<button class="hub-x" aria-label="Fermer">×</button><h2>⚙️ Espace organisateur</h2><div id="ha_body"></div>',refreshMenu);
+  o.querySelector('.hub-x').onclick=function(){ o._close(); };
   var body=o.querySelector('#ha_body');
   (async function(){
     var f; try{ f=await fb(); }catch(e){ body.innerHTML='<p class="hub-msg err">Impossible de charger Firebase (réseau ?).</p>'; return; }
@@ -26517,7 +26526,7 @@ async function isAdmin(user){
 }
 async function afterAuth(user,body){
   if(!(await isAdmin(user))){ body.innerHTML='<p class="hub-msg err">Ce compte n\u2019a pas les droits d\u2019organisateur.</p><button class="hub-btn sec" id="ha_out">Se déconnecter</button>';
-    body.querySelector('#ha_out').onclick=async function(){ var f=await fb(); await f.au.signOut(f.auth); body.innerHTML='<p>Déconnecté.</p>'; }; return; }
+    body.querySelector('#ha_out').onclick=async function(){ var f=await fb(); await f.au.signOut(f.auth); closePanel(body); }; return; }
   renderPanel(body);
 }
 function teamCount(u){ return (u.teamNames&&u.teamNames.length)||1; }
@@ -26541,6 +26550,11 @@ async function renderPanel(body){
   regs.sort(function(a,b){ var x=a.createdAt&&a.createdAt.seconds||0,y=b.createdAt&&b.createdAt.seconds||0; return x-y; });
   var targets=regs.concat(prev), total=targets.reduce(function(n,u){return n+teamCount(u);},0);
   var mode=s.mode==='common'?'common':'separate', open=s.regOpen!==false;
+  var LIMA=+s.maxTeamsPerClub||0;
+  function nk(x){ return String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim(); }
+  var byClub={}, labelOf={};
+  targets.forEach(function(u){ var k=nk(u.club); byClub[k]=(byClub[k]||0)+teamCount(u); if(!labelOf[k]) labelOf[k]=u.club||'?'; });
+  var over=LIMA>0?Object.keys(byClub).filter(function(k){ return byClub[k]>LIMA; }):[];
   var best=null; H.formats.forEach(function(n){ if(total>=n && (best===null||n>best)) best=n; });
   if(best===null) best=H.formats[0];
   var h='';
@@ -26549,11 +26563,12 @@ async function renderPanel(body){
     '<label class="hub-radio"><input type="radio" name="ha_mode" value="separate"'+(mode==='separate'?' checked':'')+'>Inscriptions séparées (comme avant)<small>Un QR code par format. Chaque appli gère ses propres inscriptions.</small></label>'+
     '<label class="hub-radio"><input type="radio" name="ha_mode" value="common"'+(mode==='common'?' checked':'')+'>Inscription commune<small>Un seul QR code (cette page). Vous choisissez ensuite le format selon le nombre d\u2019équipes.</small></label>'+
     '<label class="hub-radio"><input type="checkbox" id="ha_open"'+(open?' checked':'')+'>Inscriptions ouvertes (mode commun)</label>'+
+    '<label class="hub-radio" style="cursor:default">Max. équipes par club / entreprise (inscription commune)<br><select id="ha_max" style="margin-top:6px;padding:8px;border:1.5px solid #c9ccd1;border-radius:8px;font-size:16px"><option value="0">Illimité</option><option value="1">1 équipe max</option><option value="2">2 équipes max</option></select><small style="margin-left:0">Appliquée au formulaire d\u2019inscription et signalée dans la liste ci-dessous. À régler aussi dans l\u2019appli du format choisi (chaque appli a son propre réglage).</small></label>'+
     '<p>En mode commun, tant qu\u2019aucun format n\u2019est choisi (étape 3), le public ne voit que l\u2019inscription : ni les formats, ni l\u2019organisation.</p>'+
     '<button class="hub-btn" id="ha_save">Enregistrer le mode</button><div class="hub-msg" id="ha_msg1" role="status"></div>';
   h+='<h3>2. Inscrits en attente de format ('+total+' équipe'+(total>1?'s':'')+', '+targets.length+' responsable'+(targets.length>1?'s':'')+')</h3>';
   if(!targets.length) h+='<p>Aucune inscription commune pour l\u2019instant.</p>';
-  else h+='<div class="hub-list">'+targets.map(function(u){ return '<div><b>'+esc(u.club||'?')+'</b> — '+esc((u.teamNames&&u.teamNames.join(', '))||u.teamName||'')+'<br><small>'+esc(u.name||'')+' · '+esc(u.email||'')+(u.tournament!=='hub'?' · déjà affecté ('+esc(u.tournament)+')':'')+'</small></div>'; }).join('')+'</div>';
+  else h+=(over.length?'<p class="hub-msg err">⚠️ '+over.length+' club'+(over.length>1?'s':'')+' au-dessus de la limite de '+LIMA+' : '+over.map(function(k){ return esc(labelOf[k])+' ('+byClub[k]+'/'+LIMA+')'; }).join(', ')+'. Ils seront limités à la validation dans l\u2019appli (dérogation possible club par club).</p>':'')+'<div class="hub-list">'+targets.map(function(u){ var k=nk(u.club); return '<div><b>'+esc(u.club||'?')+'</b>'+(LIMA>0?' <span style="color:'+(byClub[k]>LIMA?'#c0281a':'#666')+'">('+byClub[k]+'/'+LIMA+')</span>':'')+' — '+esc((u.teamNames&&u.teamNames.join(', '))||u.teamName||'')+'<br><small>'+esc(u.name||'')+' · '+esc(u.email||'')+(u.tournament!=='hub'?' · déjà affecté ('+esc(u.tournament)+')':'')+'</small></div>'; }).join('')+'</div>';
   h+='<h3>3. Choisir le format du tournoi</h3><p>Les équipes seront transférées dans l\u2019appli choisie, où vous les validez comme d\u2019habitude. Possible tant que le tirage n\u2019est pas fait.</p>';
   H.formats.forEach(function(n){
     var diff=total-n, note= diff===0?'Complet : '+total+' / '+n : (diff<0?'Il manque '+(-diff)+' équipe'+(diff<-1?'s':'')+' ('+total+' / '+n+')':diff+' équipe'+(diff>1?'s':'')+' en liste d\u2019attente ('+total+' / '+n+')');
@@ -26563,15 +26578,16 @@ async function renderPanel(body){
   h+='<p style="margin-top:10px">Affiché au public (mode commun) : '+(pub?'<b>format '+esc(s.format)+' équipes</b> <button class="hub-btn sec" id="ha_unpub" style="margin:0 0 0 6px;padding:6px 10px;font-size:12px">Retirer</button>':'<b>aucun format</b> (le public ne voit que l\u2019inscription)')+'</p>';
   h+='<div class="hub-msg" id="ha_msg2" role="status"></div><div class="hub-row" style="margin-top:14px"><button class="hub-btn sec" id="ha_out">Se déconnecter</button></div>';
   body.innerHTML=h;
+  body.querySelector('#ha_max').value=String(LIMA);
   body.querySelector('#ha_save').onclick=async function(){
     var m=body.querySelector('input[name=ha_mode]:checked').value, op=body.querySelector('#ha_open').checked, msg=body.querySelector('#ha_msg1');
-    try{ await f.fs.setDoc(f.fs.doc(f.db,H.col,H.docId),{mode:m,regOpen:op,updatedAt:f.fs.serverTimestamp()},{merge:true}); setMsg(msg,'Enregistré ✅ (le menu public est mis à jour).','ok'); }
+    try{ await f.fs.setDoc(f.fs.doc(f.db,H.col,H.docId),{mode:m,regOpen:op,maxTeamsPerClub:(+body.querySelector('#ha_max').value||0),updatedAt:f.fs.serverTimestamp()},{merge:true}); setMsg(msg,'Enregistré ✅ Le menu public est mis à jour.','ok'); refreshMenu(); }
     catch(e){ setMsg(msg,errText(e),'err'); }
   };
-  body.querySelector('#ha_out').onclick=async function(){ await f.au.signOut(f.auth); body.innerHTML='<p>Déconnecté.</p>'; };
+  body.querySelector('#ha_out').onclick=async function(){ await f.au.signOut(f.auth); closePanel(body); };
   var unp=body.querySelector('#ha_unpub');
   if(unp) unp.onclick=async function(){
-    try{ await f.fs.setDoc(f.fs.doc(f.db,H.col,H.docId),{format:null,updatedAt:f.fs.serverTimestamp()},{merge:true}); renderPanel(body); }
+    try{ await f.fs.setDoc(f.fs.doc(f.db,H.col,H.docId),{format:null,updatedAt:f.fs.serverTimestamp()},{merge:true}); refreshMenu(); renderPanel(body); }
     catch(e){ setMsg(body.querySelector('#ha_msg2'),errText(e),'err'); }
   };
   [].forEach.call(body.querySelectorAll('button[data-n]'),function(b){
@@ -26584,7 +26600,8 @@ async function renderPanel(body){
         for(var i=0;i<targets.length;i++){ await f.fs.updateDoc(f.fs.doc(f.db,'users',targets[i].id),{tournament:tag}); ok++; ids.push(targets[i].id); }
         await f.fs.setDoc(f.fs.doc(f.db,H.col,'assigned'),{format:n,tag:tag,uids:ids,at:f.fs.serverTimestamp()});
         await f.fs.setDoc(f.fs.doc(f.db,H.col,H.docId),{format:n,updatedAt:f.fs.serverTimestamp()},{merge:true});
-        setMsg(msg,'✅ '+ok+' inscription'+(ok>1?'s':'')+' transférée'+(ok>1?'s':'')+' vers le format '+n+'. Ouvrez l\u2019appli '+n+' équipes pour les valider.','ok');
+        setMsg(msg,'✅ '+ok+' inscription'+(ok>1?'s':'')+' transférée'+(ok>1?'s':'')+' vers le format '+n+'. Ouvrez l\u2019appli '+n+' équipes pour les valider.'+(LIMA>0?' Pensez à régler « Max. équipes par club » sur '+LIMA+' dans cette appli.':''),'ok');
+        refreshMenu();
         setTimeout(function(){ renderPanel(body); },1800);
       }catch(e){ setMsg(msg,'Arrêt après '+ok+' transfert(s) : '+errText(e),'err'); b.disabled=false; }
     };
