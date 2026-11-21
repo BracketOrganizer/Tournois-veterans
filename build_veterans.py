@@ -86,15 +86,24 @@ var H=@@HUBCFG@@;
 var SDK='https://www.gstatic.com/firebasejs/10.12.0/', FB=null, SET=null;
 function $(id){return document.getElementById(id);}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+/* fbCore : lecture Firestore seule (aucune initialisation de la connexion) ; fb : ajoute l'authentification, seulement si nécessaire. */
+var FBC=null;
+async function fbCore(){
+  if(FBC) return FBC;
+  window.__hubTouched=true;
+  var m=await Promise.all([import(SDK+'firebase-app.js'),import(SDK+'firebase-firestore.js')]);
+  var app=m[0].initializeApp(H.fb);
+  FBC={app:app,fs:m[1],db:m[1].getFirestore(app)};
+  return FBC;
+}
 async function fb(){
   if(FB) return FB;
-  var m=await Promise.all([import(SDK+'firebase-app.js'),import(SDK+'firebase-auth.js'),import(SDK+'firebase-firestore.js')]);
-  var app=m[0].initializeApp(H.fb);
-  FB={au:m[1],fs:m[2],auth:m[1].getAuth(app),db:m[2].getFirestore(app)};
+  var c=await fbCore(), au=await import(SDK+'firebase-auth.js');
+  FB={au:au,fs:c.fs,auth:au.getAuth(c.app),db:c.db};
   return FB;
 }
 async function loadSettings(){
-  try{ var f=await fb(); var s=await f.fs.getDoc(f.fs.doc(f.db,H.col,H.docId)); SET=s.exists()?(s.data()||{}):{}; }
+  try{ var f=await fbCore(); var s=await f.fs.getDoc(f.fs.doc(f.db,H.col,H.docId)); SET=s.exists()?(s.data()||{}):{}; }
   catch(e){ SET=null; }
   return SET;
 }
@@ -125,7 +134,7 @@ function chosen(s){
 /* Compteur public (hub_regs) : une fiche anonyme par inscription {teams, createdAt}, sans donnée personnelle. */
 async function takenCount(){
   try{
-    var f=await fb(), snap=await f.fs.getDocs(f.fs.collection(f.db,H.regs)), n=0;
+    var f=await fbCore(), snap=await f.fs.getDocs(f.fs.collection(f.db,H.regs)), n=0;
     snap.forEach(function(d){ var x=d.data(); n+=(x&&+x.teams)||1; });
     return n;
   }catch(e){ return null; }
@@ -452,11 +461,19 @@ a.card.last{border-color:#ffb066;box-shadow:0 0 0 2px rgba(255,176,102,.28)}
   }
   function start(){
     if(!el){ showMenu(); return; }
+    // accès direct à une appli déjà autorisé par la vérification précédente : on la lance dans une page propre
+    try{ if(sessionStorage.getItem('hubAllow')===String(f)){ sessionStorage.removeItem('hubAllow'); loadApp(); return; } }catch(e){}
     // inscription commune : accès direct aux applis contrôlé (erreur ou délai dépassé = accès normal)
     var done=false;
     function go(ok){
       if(done) return; done=true;
-      if(ok){ loadApp(); }
+      if(ok){
+        // Firebase a été utilisé pour la vérification : on recharge la page pour que l'appli démarre comme à l'origine
+        // (connexion Google comprise), sans rien hériter de la page du menu.
+        var re=false;
+        if(window.__hubTouched){ try{ sessionStorage.setItem('hubAllow',String(f)); re=true; }catch(e){} }
+        if(re){ location.reload(); } else { loadApp(); }
+      }
       else { try{ history.replaceState(null,'',location.pathname); }catch(e){} showMenu(); }
     }
     setTimeout(function(){ go(true); }, 3500);
