@@ -13345,7 +13345,6 @@ input[type=date]{ width:100%;padding:9px 12px;background:var(--s2);border:1.5px 
 
 </div><\!-- /appScreen -->
 </body></html>
-
 </script>
 <script type="text/plain" id="app20">
 <!DOCTYPE html>
@@ -26373,11 +26372,10 @@ input[type=date]{ width:100%;padding:9px 12px;background:var(--s2);border:1.5px 
 
 </div><\!-- /appScreen -->
 </body></html>
-
 </script>
 <script>
 (function(){
-var H={"fb": {"apiKey": "AIzaSyCDKgq7NWknOORUwLilkdHnCG6cet6VMZ4", "authDomain": "tournoi-veterans.firebaseapp.com", "projectId": "tournoi-veterans", "storageBucket": "tournoi-veterans.firebasestorage.app", "messagingSenderId": "474870610264", "appId": "1:474870610264:web:b9e57be2f9e7f098c28d2d"}, "admins": ["bracket.organizer@gmail.com"], "tags": {"12": "foot12", "16": "foot16", "20": "foot20", "24": "foot24"}, "formats": [12, 16, 20, 24], "col": "hub", "docId": "settings"};
+var H={"fb": {"apiKey": "AIzaSyCDKgq7NWknOORUwLilkdHnCG6cet6VMZ4", "authDomain": "tournoi-veterans.firebaseapp.com", "projectId": "tournoi-veterans", "storageBucket": "tournoi-veterans.firebasestorage.app", "messagingSenderId": "474870610264", "appId": "1:474870610264:web:b9e57be2f9e7f098c28d2d"}, "admins": ["bracket.organizer@gmail.com"], "tags": {"12": "foot12", "16": "foot16", "20": "foot20", "24": "foot24"}, "formats": [12, 16, 20, 24], "col": "hub", "docId": "settings", "regs": "hub_regs"};
 var SDK='https://www.gstatic.com/firebasejs/10.12.0/', FB=null, SET=null;
 function $(id){return document.getElementById(id);}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
@@ -26417,14 +26415,39 @@ function chosen(s){
   var f=s&&s.format?String(s.format):null; if(!f) return null;
   return document.querySelector('a.card[data-f="'+f+'"]')?f:null;
 }
+/* Compteur public (hub_regs) : une fiche anonyme par inscription {teams, createdAt}, sans donnée personnelle. */
+async function takenCount(){
+  try{
+    var f=await fb(), snap=await f.fs.getDocs(f.fs.collection(f.db,H.regs)), n=0;
+    snap.forEach(function(d){ var x=d.data(); n+=(x&&+x.teams)||1; });
+    return n;
+  }catch(e){ return null; }
+}
+async function resync(f,targets){
+  var del=0, add=0, have={}, ids=[];
+  var snap=await f.fs.getDocs(f.fs.collection(f.db,H.regs));
+  snap.forEach(function(d){ ids.push(d.id); have[d.id]=true; });
+  for(var i=0;i<ids.length;i++){
+    var u=await f.fs.getDoc(f.fs.doc(f.db,'users',ids[i]));
+    if(!u.exists()){ await f.fs.deleteDoc(f.fs.doc(f.db,H.regs,ids[i])); del++; }
+  }
+  for(var k=0;k<targets.length;k++){
+    if(!have[targets[k].id]){ await f.fs.setDoc(f.fs.doc(f.db,H.regs,targets[k].id),{teams:teamCount(targets[k]),createdAt:f.fs.serverTimestamp()}); add++; }
+  }
+  return {del:del,add:add};
+}
 function renderBanner(s){
   var slot=$('hubSlot'); if(!slot) return;
-  var open=s.regOpen!==false, fmt=chosen(s);
+  var open=s.regOpen!==false, fmt=chosen(s), cap=+s.maxTeamsTotal||0;
   if(!open && fmt){ slot.innerHTML=''; return; }
-  slot.innerHTML='<div class="hub-banner"><b>📝 Inscription</b>'+
-    (open?'Inscrivez votre équipe : l\u2019organisation vous communiquera ensuite l\u2019accès au tournoi.<br><button class="hub-btn" id="hubRegBtn">S\u2019inscrire</button>'
-         :'Les inscriptions sont actuellement fermées. Le tournoi sera annoncé prochainement.')+'</div>';
-  var b=$('hubRegBtn'); if(b) b.onclick=openReg;
+  function html(full){
+    return '<div class="hub-banner"><b>📝 Inscription</b>'+
+      ((open&&!full)?'Inscrivez votre équipe : l\u2019organisation vous communiquera ensuite l\u2019accès au tournoi.<br><button class="hub-btn" id="hubRegBtn">S\u2019inscrire</button>'
+       :(full?'Les inscriptions sont complètes.':'Les inscriptions sont actuellement fermées. Le tournoi sera annoncé prochainement.'))+'</div>';
+  }
+  function put(full){ slot.innerHTML=html(full); var b=$('hubRegBtn'); if(b) b.onclick=openReg; }
+  if(open && cap>0){ slot.innerHTML=''; takenCount().then(function(t){ put(t!==null&&t>=cap); }); return; }
+  put(false);
 }
 /* Menu public : en mode commun, aucun format n'est visible tant que l'organisateur n'en a pas choisi un ;
    ensuite seul le bouton du format choisi apparaît. En cas d'erreur de lecture : menu normal (apps séparées). */
@@ -26483,12 +26506,21 @@ function openReg(){
     try{
       var cur=await loadSettings();
       if(cur && cur.regOpen===false){ setMsg(msg,'Les inscriptions sont fermées.','err'); btn.disabled=false; return; }
+      var CAP=(cur&&+cur.maxTeamsTotal)||0;
+      if(CAP>0){
+        var tk=await takenCount();
+        if(tk!==null){
+          if(tk>=CAP){ setMsg(msg,'Les inscriptions sont complètes.','err'); btn.disabled=false; return; }
+          if(tk+names.length>CAP){ setMsg(msg,'Il ne reste pas assez de places pour '+names.length+' équipe'+(names.length>1?'s':'')+'. Réduisez le nombre d\u2019équipes.','err'); btn.disabled=false; return; }
+        }
+      }
       var L2=(cur&&+cur.maxTeamsPerClub)||0;
       if(L2>0 && names.length>L2){ setMsg(msg,'Maximum '+L2+' équipe'+(L2>1?'s':'')+' par club / entreprise.','err'); btn.disabled=false; return; }
       f=await fb(); cred=await f.au.createUserWithEmailAndPassword(f.auth,email,pwd);
     }catch(e){ setMsg(msg,errText(e),'err'); btn.disabled=false; return; }
     try{
       await f.fs.setDoc(f.fs.doc(f.db,'users',cred.user.uid),{email:email,name:contact,role:'registrant',tournament:'hub',teamName:team,teamNames:names,club:club,phone:phone,regStatus:'pending',createdAt:f.fs.serverTimestamp()},{merge:true});
+      try{ await f.fs.setDoc(f.fs.doc(f.db,H.regs,cred.user.uid),{teams:names.length,createdAt:f.fs.serverTimestamp()}); }catch(e3){}
       o.querySelector('.hub-card').innerHTML='<button class="hub-x" aria-label="Fermer">×</button><h2>✅ Inscription enregistrée</h2><p>Merci ! Votre inscription ('+names.length+' équipe'+(names.length>1?'s':'')+') est en attente. Revenez sur cette page : l\u2019accès au tournoi y apparaîtra dès son ouverture par l\u2019organisation. Connectez-vous alors avec l\u2019email '+esc(email)+'.</p>';
       o.querySelector('.hub-x').onclick=function(){o.remove();};
     }catch(e){
@@ -26557,8 +26589,10 @@ async function renderPanel(body){
   var byClub={}, labelOf={};
   targets.forEach(function(u){ var k=nk(u.club); byClub[k]=(byClub[k]||0)+teamCount(u); if(!labelOf[k]) labelOf[k]=u.club||'?'; });
   var over=LIMA>0?Object.keys(byClub).filter(function(k){ return byClub[k]>LIMA; }):[];
-  var best=null; H.formats.forEach(function(n){ if(total>=n && (best===null||n>best)) best=n; });
-  if(best===null) best=H.formats[0];
+  var CAPA=+s.maxTeamsTotal||0, taken=await takenCount();
+  var allowed=H.formats.filter(function(n){ return CAPA===0||n<=CAPA; }); if(!allowed.length) allowed=H.formats;
+  var best=null; allowed.forEach(function(n){ if(total>=n && (best===null||n>best)) best=n; });
+  if(best===null) best=allowed[0];
   var h='';
   if(err) h+='<p class="hub-msg err">'+esc(err)+'</p>';
   h+='<h3>1. Mode des inscriptions</h3>'+
@@ -26566,24 +26600,35 @@ async function renderPanel(body){
     '<label class="hub-radio"><input type="radio" name="ha_mode" value="common"'+(mode==='common'?' checked':'')+'>Inscription commune<small>Un seul QR code (cette page). Vous choisissez ensuite le format selon le nombre d\u2019équipes.</small></label>'+
     '<label class="hub-radio"><input type="checkbox" id="ha_open"'+(open?' checked':'')+'>Inscriptions ouvertes (mode commun)</label>'+
     '<label class="hub-radio" style="cursor:default">Max. équipes par club / entreprise (inscription commune)<br><select id="ha_max" style="margin-top:6px;padding:8px;border:1.5px solid #c9ccd1;border-radius:8px;font-size:16px"><option value="0">Illimité</option><option value="1">1 équipe max</option><option value="2">2 équipes max</option></select><small style="margin-left:0">Appliquée au formulaire d\u2019inscription et signalée dans la liste ci-dessous. À régler aussi dans l\u2019appli du format choisi (chaque appli a son propre réglage).</small></label>'+
+    '<label class="hub-radio" style="cursor:default">Nombre maximum d\u2019équipes inscrites (inscription commune)<br><select id="ha_cap" style="margin-top:6px;padding:8px;border:1.5px solid #c9ccd1;border-radius:8px;font-size:16px"><option value="0">Illimité</option>'+H.formats.map(function(n){ return '<option value="'+n+'">'+n+' équipes max</option>'; }).join('')+'</select><small style="margin-left:0">Quand ce nombre est atteint, les inscriptions se ferment automatiquement pour le public. Les formats plus grands ne sont alors plus proposés à l\u2019étape 3.</small></label>'+
     '<p>En mode commun, tant qu\u2019aucun format n\u2019est choisi (étape 3), le public ne voit que l\u2019inscription : ni les formats, ni l\u2019organisation.</p>'+
     '<button class="hub-btn" id="ha_save">Enregistrer le mode</button><div class="hub-msg" id="ha_msg1" role="status"></div>';
   h+='<h3>2. Inscrits en attente de format ('+total+' équipe'+(total>1?'s':'')+', '+targets.length+' responsable'+(targets.length>1?'s':'')+')</h3>';
+  h+='<p>Compteur public des inscriptions : <b>'+(taken===null?'illisible (règle hub_regs à ajouter)':taken+' équipe'+(taken>1?'s':''))+'</b>'+(CAPA>0?' sur '+CAPA+' autorisées':'')+' <button class="hub-btn sec" id="ha_sync" style="margin:0 0 0 6px;padding:6px 10px;font-size:12px">Resynchroniser</button></p>';
   if(!targets.length) h+='<p>Aucune inscription commune pour l\u2019instant.</p>';
   else h+=(over.length?'<p class="hub-msg err">⚠️ '+over.length+' club'+(over.length>1?'s':'')+' au-dessus de la limite de '+LIMA+' : '+over.map(function(k){ return esc(labelOf[k])+' ('+byClub[k]+'/'+LIMA+')'; }).join(', ')+'. Ils seront limités à la validation dans l\u2019appli (dérogation possible club par club).</p>':'')+'<div class="hub-list">'+targets.map(function(u){ var k=nk(u.club); return '<div><b>'+esc(u.club||'?')+'</b>'+(LIMA>0?' <span style="color:'+(byClub[k]>LIMA?'#c0281a':'#666')+'">('+byClub[k]+'/'+LIMA+')</span>':'')+' — '+esc((u.teamNames&&u.teamNames.join(', '))||u.teamName||'')+'<br><small>'+esc(u.name||'')+' · '+esc(u.email||'')+(u.tournament!=='hub'?' · déjà affecté ('+esc(u.tournament)+')':'')+'</small></div>'; }).join('')+'</div>';
   h+='<h3>3. Choisir le format du tournoi</h3><p>Les équipes seront transférées dans l\u2019appli choisie, où vous les validez comme d\u2019habitude. Possible tant que le tirage n\u2019est pas fait.</p>';
   H.formats.forEach(function(n){
+    var blocked=CAPA>0&&n>CAPA;
     var diff=total-n, note= diff===0?'Complet : '+total+' / '+n : (diff<0?'Il manque '+(-diff)+' équipe'+(diff<-1?'s':'')+' ('+total+' / '+n+')':diff+' équipe'+(diff>1?'s':'')+' en liste d\u2019attente ('+total+' / '+n+')');
-    h+='<div class="hub-fmt'+(n===best?' best':'')+'"><div><b>'+n+' équipes</b>'+(n===best?' · suggéré':'')+'<small>'+esc(note)+' · <a href="?f='+n+'" target="_blank" rel="noopener">Ouvrir l\u2019appli</a></small></div><button class="hub-btn'+(n===best?'':' sec')+'" data-n="'+n+'"'+(targets.length?'':' disabled')+'>Utiliser</button></div>';
+    if(blocked) note='Inutilisable : maximum d\u2019inscriptions fixé à '+CAPA;
+    h+='<div class="hub-fmt'+(n===best&&!blocked?' best':'')+'"'+(blocked?' style="opacity:.55"':'')+'><div><b>'+n+' équipes</b>'+(n===best&&!blocked?' · suggéré':'')+'<small>'+esc(note)+' · <a href="?f='+n+'" target="_blank" rel="noopener">Ouvrir l\u2019appli</a></small></div><button class="hub-btn'+(n===best&&!blocked?'':' sec')+'" data-n="'+n+'"'+((targets.length&&!blocked)?'':' disabled')+'>Utiliser</button></div>';
   });
   var pub=s.format&&s.mode==='common';
   h+='<p style="margin-top:10px">Affiché au public (mode commun) : '+(pub?'<b>format '+esc(s.format)+' équipes</b> <button class="hub-btn sec" id="ha_unpub" style="margin:0 0 0 6px;padding:6px 10px;font-size:12px">Retirer</button>':'<b>aucun format</b> (le public ne voit que l\u2019inscription)')+'</p>';
   h+='<div class="hub-msg" id="ha_msg2" role="status"></div><div class="hub-row" style="margin-top:14px"><button class="hub-btn sec" id="ha_out">Se déconnecter</button></div>';
   body.innerHTML=h;
   body.querySelector('#ha_max').value=String(LIMA);
+  body.querySelector('#ha_cap').value=String(CAPA);
+  var sy=body.querySelector('#ha_sync');
+  if(sy) sy.onclick=async function(){
+    var m2=body.querySelector('#ha_msg2'); sy.disabled=true; setMsg(m2,'Resynchronisation…','');
+    try{ var r=await resync(f,targets); setMsg(m2,'Compteur resynchronisé : '+r.del+' supprimé(s), '+r.add+' ajouté(s).','ok'); setTimeout(function(){ renderPanel(body); },1200); }
+    catch(e){ setMsg(m2,errText(e),'err'); sy.disabled=false; }
+  };
   body.querySelector('#ha_save').onclick=async function(){
     var m=body.querySelector('input[name=ha_mode]:checked').value, op=body.querySelector('#ha_open').checked, msg=body.querySelector('#ha_msg1');
-    try{ await f.fs.setDoc(f.fs.doc(f.db,H.col,H.docId),{mode:m,regOpen:op,maxTeamsPerClub:(+body.querySelector('#ha_max').value||0),updatedAt:f.fs.serverTimestamp()},{merge:true}); setMsg(msg,'Enregistré ✅ Le menu public est mis à jour.','ok'); refreshMenu(); }
+    try{ await f.fs.setDoc(f.fs.doc(f.db,H.col,H.docId),{mode:m,regOpen:op,maxTeamsPerClub:(+body.querySelector('#ha_max').value||0),maxTeamsTotal:(+body.querySelector('#ha_cap').value||0),updatedAt:f.fs.serverTimestamp()},{merge:true}); setMsg(msg,'Enregistré ✅ Le menu public est mis à jour.','ok'); refreshMenu(); }
     catch(e){ setMsg(msg,errText(e),'err'); }
   };
   body.querySelector('#ha_out').onclick=async function(){ await f.au.signOut(f.auth); closePanel(body); };
