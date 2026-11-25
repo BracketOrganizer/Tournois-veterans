@@ -47,7 +47,7 @@ for _n,_fn in SRC.items():
         for _e in re.findall(r"'([^']+)'", _blk):
             if _e not in _hub_admins: _hub_admins.append(_e)
 if not _hub_fb or len(_hub_tags) != len(SRC): sys.exit('Configuration Firebase / tags introuvables dans les sources')
-HUBCFG = json.dumps({'fb':_hub_fb,'admins':_hub_admins,'tags':_hub_tags,'formats':list(SRC.keys()),'col':'hub','docId':'settings','regs':'hub_regs'}, ensure_ascii=False)
+HUBCFG = json.dumps({'fb':_hub_fb,'admins':_hub_admins,'tags':_hub_tags,'formats':list(SRC.keys()),'col':'hub','docId':'settings','regs':'hub_regs','alt':{'12':10}}, ensure_ascii=False)
 HUBCSS = r''':root{--hub-ac:#ffb066}
 /* ── HUB : inscription commune + espace organisateur ── */
 .hub-banner{margin:14px 0 18px;padding:14px 16px;border-radius:14px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.25);text-align:center;font-size:13px;line-height:1.5}
@@ -307,7 +307,7 @@ async function renderPanel(body){
   var over=LIMA>0?Object.keys(byClub).filter(function(k){ return byClub[k]>LIMA; }):[];
   var CAPA=+s.maxTeamsTotal||0, taken=await takenCount();
   var allowed=H.formats.filter(function(n){ return CAPA===0||n<=CAPA; }); if(!allowed.length) allowed=H.formats;
-  var best=null; allowed.forEach(function(n){ if(total>=n && (best===null||n>best)) best=n; });
+  var best=null; allowed.forEach(function(n){ var t=(H.alt&&H.alt[n])?+H.alt[n]:n; if(total>=t && (best===null||n>best)) best=n; });
   if(best===null) best=allowed[0];
   var h='';
   if(err) h+='<p class="hub-msg err">'+esc(err)+'</p>';
@@ -327,6 +327,8 @@ async function renderPanel(body){
   H.formats.forEach(function(n){
     var blocked=CAPA>0&&n>CAPA;
     var diff=total-n, note= diff===0?'Complet : '+total+' / '+n : (diff<0?'Il manque '+(-diff)+' équipe'+(diff<-1?'s':'')+' ('+total+' / '+n+')':diff+' équipe'+(diff>1?'s':'')+' en liste d\u2019attente ('+total+' / '+n+')');
+    var alt=(H.alt&&H.alt[n])?+H.alt[n]:0;
+    if(alt && total>=alt && total<n) note='Programme à '+alt+' équipes possible ('+total+' / '+alt+') · il manque '+(n-total)+' pour '+n+' équipes';
     if(blocked) note='Inutilisable : maximum d\u2019inscriptions fixé à '+CAPA;
     h+='<div class="hub-fmt'+(n===best&&!blocked?' best':'')+'"'+(blocked?' style="opacity:.55"':'')+'><div><b>'+n+' équipes</b>'+(n===best&&!blocked?' · suggéré':'')+'<small>'+esc(note)+' · <a href="?f='+n+'" target="_blank" rel="noopener">Ouvrir l\u2019appli</a></small></div><button class="hub-btn'+(n===best&&!blocked?'':' sec')+'" data-n="'+n+'"'+((targets.length&&!blocked)?'':' disabled')+'>Utiliser</button></div>';
   });
@@ -487,15 +489,16 @@ a.card.last{border-color:#ffb066;box-shadow:0 0 0 2px rgba(255,176,102,.28)}
 </body>
 </html>
 '''
+LABEL = {12: '10 ou 12 équipes'}   # le format 12 accepte aussi un tournoi à 10 équipes (programme 3)
 INFO = {
-    12: '3 formules · 4 à 6 matchs par équipe',
+    12: '3 formules · 5 à 6 matchs par équipe',
     16: '4 poules de 4 · 6 matchs par équipe',
     20: '4 poules de 5 · 6 matchs par équipe',
     24: '4 poules de 6 · 8 matchs par équipe',
 }
 cards = ''
 for n in SRC:
-    cards += '  <a class="card" data-f="' + str(n) + '" href="?f=' + str(n) + '"><span class="num">' + str(n) + '</span><span class="lbl">' + str(n) + ' équipes<small>' + INFO.get(n, '') + '</small></span></a>' + chr(10)
+    cards += '  <a class="card" data-f="' + str(n) + '" href="?f=' + str(n) + '"><span class="num">' + str(n) + '</span><span class="lbl">' + LABEL.get(n, str(n) + ' équipes') + '<small>' + INFO.get(n, '') + '</small></span></a>' + chr(10)
 html = TEMPLATE.replace('@@HUBCSS@@', HUBCSS).replace('@@HUBJS@@', HUBJS.replace('@@HUBCFG@@', HUBCFG)).replace('@@BLOCKS@@', chr(10).join(blocks)).replace('@@CARDS@@', cards).replace('@@LOGO@@', LOGO).replace('@@FAV@@', FAV)
 with open(os.path.join(BASE, OUT), 'w', encoding='utf-8', newline=chr(10)) as fh:
     fh.write(html)
